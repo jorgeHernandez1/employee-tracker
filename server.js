@@ -39,6 +39,7 @@ const manageEmployees = () => {
           "Add Employee",
           "Add Department",
           "Add Role",
+          "Update Employee Role",
           "Exit",
         ],
       },
@@ -69,11 +70,62 @@ const manageEmployees = () => {
           viewData("Roles");
           break;
 
+        case "Update Employee Role":
+          updateRole();
+          break;
+
         default:
           connection.end();
       }
     });
 };
+
+const updateRole = async () => {
+  //refreshes roles and employees that are used to add new emp
+  const roles = await getRoles();
+  const [employees, ids] = await getEmployees();
+
+  inquirer
+    .prompt([
+      {
+        name: "employee",
+        message: "Which employee would you like to update?",
+        type: "list",
+        choices: employees,
+      },
+      {
+        name: "newRole",
+        message: "What is the employees new role?",
+        type: "list",
+        choices: roles,
+      },
+    ])
+    .then((answer) => {
+      const query = `
+      UPDATE 
+        employee
+      SET
+        role_id = (
+          SELECT 
+            id 
+          FROM
+            role AS tmp
+          WHERE
+            title = '${answer.newRole}')
+      WHERE
+        id = ${ids[answer.employee]}
+        `;
+
+      connection.query(query, (err, res) => {
+        if (err) {
+          throw err;
+        } else {
+            console.log(`${answer.employee} has been assigned a new role as ${answer.newRole}.`);
+        }
+        manageEmployees();
+        });
+  });
+}
 
 const viewData = async (tbl) => {
   let query = "";

@@ -1,6 +1,8 @@
 const connection = require("./config/connection");
 const inquirer = require("inquirer");
 const figlet = require("figlet");
+const cTable = require("console.table");
+
 ///initiazlizes app
 const init = () => {
   connection.connect((err) => {
@@ -55,10 +57,100 @@ const manageEmployees = () => {
           addRole();
           break;
 
+        case "View All Employees":
+          viewData("Employees");
+          break;
+
+        case "View All Departments":
+          viewData("Departments");
+          break;
+
+        case "View All Roles":
+          viewData("Roles");
+          break;
+
         default:
           connection.end();
       }
     });
+};
+
+const viewData = async (tbl) => {
+  let query = "";
+  //handle param to build query
+  switch (tbl) {
+    case "Employees":
+      query = `
+        SELECT 
+          employee.id,
+          employee.first_name,
+          employee.last_name,
+          role.title,
+          department.name as department,
+          role.salary,
+          (SELECT 
+          CONCAT(employee.first_name,' ', employee.last_name) As manager
+        FROM 
+          employee AS tmp
+        WHERE
+          tmp.id = employee.manager_id
+        ) as manager
+        FROM 
+          employee
+        JOIN
+          role
+        ON
+          employee.role_id = role.id
+        JOIN
+          department
+        ON
+          role.department_id = department.id
+  `;
+      break;
+
+    case "Roles":
+      query = `
+        SELECT 
+          role.id,
+          role.title,
+          role.salary,
+          department.name as department_name
+        FROM 
+          role
+        JOIN
+          department
+        ON
+          role.department_id = department.id
+  `;
+      break;
+
+    case "Departments":
+      query = `
+      SELECT 
+        d.id,
+        d.name,
+        COUNT(*) AS total_employees
+      FROM 
+        employee AS e
+      JOIN
+        role AS r
+      ON
+        e.role_id = r.id
+      JOIN
+        department AS d
+      ON
+        r.department_id = d.id
+      GROUP BY
+        d.id
+  `;
+      break;
+  }
+  //query db and wait for results to be ready
+  const rows = await queryDB(query);
+  //display results
+  console.table(rows);
+  //reprompt user
+  manageEmployees();
 };
 
 const addRole = async () => {
@@ -289,10 +381,10 @@ const getDepartments = async () => {
 };
 
 //created querying function that returns promise to be used when we need to await results
-//from dbbefore running code 
-const queryDB = async (sql) => {
+//from dbbefore running code
+const queryDB = async (sql, args) => {
   return new Promise((resolve, reject) => {
-    connection.query(sql, (err, rows) => {
+    connection.query(sql, args, (err, rows) => {
       if (err) {
         return reject(err);
       } else {
